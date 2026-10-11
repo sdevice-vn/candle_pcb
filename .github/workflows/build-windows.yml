@@ -1,1 +1,44 @@
+name: Build Candle PCB (Windows)
 
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-make
+            mingw-w64-x86_64-qt5-base
+            mingw-w64-x86_64-qt5-serialport
+            mingw-w64-x86_64-qt5-winextras
+            mingw-w64-x86_64-qt5-tools
+
+      - name: Build
+        shell: msys2 {0}
+        run: |
+          cd src
+          lrelease-qt5 translations/candle_vi.ts -qm translations/candle_vi.qm
+          qmake-qt5 candle.pro CONFIG+=release
+          mingw32-make -j4
+
+      - name: Package
+        shell: msys2 {0}
+        run: |
+          mkdir -p dist/translations
+          cp src/release/Candle.exe dist/
+          cp src/translations/candle_vi.qm dist/translations/
+          windeployqt-qt5 --release --no-translations dist/Candle.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Candle_PCB_Windows
+          path: dist
