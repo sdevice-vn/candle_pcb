@@ -35,6 +35,8 @@ jobs:
         shell: msys2 {0}
         run: |
           cd candle/src
+          # 64-bit ld does not know the 32-bit-only --large-address-aware flag
+          sed -i '/large-address-aware/d' candle.pro
           lrelease-qt5 translations/candle_vi.ts -qm translations/candle_vi.qm
           qmake-qt5 candle.pro CONFIG+=release
           mingw32-make -j4
