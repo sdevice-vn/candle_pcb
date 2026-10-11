@@ -10,6 +10,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Get Candle v1.1.8 source and apply PCB patch
+        shell: bash
+        run: |
+          git clone --depth 1 --branch v1.1.8 https://github.com/Denvi/Candle.git candle
+          cd candle
+          git apply --whitespace=nowarn ../candle_pcb_vi.patch
+
       - uses: msys2/setup-msys2@v2
         with:
           msystem: MINGW64
@@ -25,7 +32,7 @@ jobs:
       - name: Build
         shell: msys2 {0}
         run: |
-          cd src
+          cd candle/src
           lrelease-qt5 translations/candle_vi.ts -qm translations/candle_vi.qm
           qmake-qt5 candle.pro CONFIG+=release
           mingw32-make -j4
@@ -34,8 +41,8 @@ jobs:
         shell: msys2 {0}
         run: |
           mkdir -p dist/translations
-          cp src/release/Candle.exe dist/
-          cp src/translations/candle_vi.qm dist/translations/
+          cp candle/src/release/Candle.exe dist/
+          cp candle/src/translations/candle_vi.qm dist/translations/
           windeployqt-qt5 --release --no-translations dist/Candle.exe
 
       - uses: actions/upload-artifact@v4
