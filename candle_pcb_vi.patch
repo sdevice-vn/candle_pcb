@@ -1,0 +1,1581 @@
+diff --git a/src/candle.pro b/src/candle.pro
+index c0c5ed3..21a6c53 100644
+--- a/src/candle.pro
++++ b/src/candle.pro
+@@ -35,7 +35,7 @@ RC_ICONS += images/candle.ico
+ DEFINES += sNan=\"65536\"
+ DEFINES += APP_VERSION=\\\"$$VERSION\\\"
+ 
+-TRANSLATIONS += translations/candle_en.ts translations/candle_ru.ts translations/candle_es.ts translations/candle_fr.ts translations/candle_pt.ts
++TRANSLATIONS += translations/candle_en.ts translations/candle_ru.ts translations/candle_es.ts translations/candle_fr.ts translations/candle_pt.ts translations/candle_vi.ts
+ 
+ SOURCES += main.cpp\
+         frmmain.cpp \
+diff --git a/src/frmmain.cpp b/src/frmmain.cpp
+index cab8602..de67b0b 100644
+--- a/src/frmmain.cpp
++++ b/src/frmmain.cpp
+@@ -335,10 +335,10 @@ void frmMain::loadSettings()
+ 
+     m_settings->setFontSize(set.value("fontSize", 8).toInt());
+     m_settings->setPort(set.value("port").toString());
+-    m_settings->setBaud(set.value("baud").toInt());
++    m_settings->setBaud(set.value("baud", 115200).toInt());
+     m_settings->setIgnoreErrors(set.value("ignoreErrors", false).toBool());
+     m_settings->setAutoLine(set.value("autoLine", true).toBool());
+-    m_settings->setToolDiameter(set.value("toolDiameter", 3).toDouble());
++    m_settings->setToolDiameter(set.value("toolDiameter", 0.2).toDouble());
+     m_settings->setToolLength(set.value("toolLength", 15).toDouble());
+     m_settings->setAntialiasing(set.value("antialiasing", true).toBool());
+     m_settings->setMsaa(set.value("msaa", true).toBool());
+@@ -358,14 +358,14 @@ void frmMain::loadSettings()
+     m_settings->setShowProgramCommands(set.value("showProgramCommands", 0).toBool());
+     m_settings->setShowUICommands(set.value("showUICommands", 0).toBool());
+     m_settings->setSpindleSpeedMin(set.value("spindleSpeedMin", 0).toInt());
+-    m_settings->setSpindleSpeedMax(set.value("spindleSpeedMax", 100).toInt());
++    m_settings->setSpindleSpeedMax(set.value("spindleSpeedMax", 10000).toInt());
+     m_settings->setLaserPowerMin(set.value("laserPowerMin", 0).toInt());
+     m_settings->setLaserPowerMax(set.value("laserPowerMax", 100).toInt());
+-    m_settings->setRapidSpeed(set.value("rapidSpeed", 0).toInt());
+-    m_settings->setHeightmapProbingFeed(set.value("heightmapProbingFeed", 0).toInt());
++    m_settings->setRapidSpeed(set.value("rapidSpeed", 2500).toInt());
++    m_settings->setHeightmapProbingFeed(set.value("heightmapProbingFeed", 10).toInt());
+     m_settings->setAcceleration(set.value("acceleration", 10).toInt());
+-    m_settings->setToolAngle(set.value("toolAngle", 0).toDouble());
+-    m_settings->setToolType(set.value("toolType", 0).toInt());
++    m_settings->setToolAngle(set.value("toolAngle", 15).toDouble());
++    m_settings->setToolType(set.value("toolType", 1).toInt());
+     m_settings->setFps(set.value("fps", 60).toInt());
+     m_settings->setQueryStateTime(set.value("queryStateTime", 250).toInt());
+ 
+@@ -423,7 +423,7 @@ void frmMain::loadSettings()
+     m_storedKeyboardControl = set.value("keyboardControl", false).toBool();
+ 
+     m_settings->setAutoCompletion(set.value("autoCompletion", true).toBool());
+-    m_settings->setTouchCommand(set.value("touchCommand").toString());
++    m_settings->setTouchCommand(set.value("touchCommand", "G21G91G38.2Z-30F100; G0Z1; G38.2Z-2F10").toString());
+     m_settings->setSafePositionCommand(set.value("safePositionCommand").toString());
+ 
+     foreach (StyledToolButton* button, this->findChildren<StyledToolButton*>(QRegExp("cmdUser\\d"))) {
+@@ -442,10 +442,10 @@ void frmMain::loadSettings()
+     ui->txtHeightMapBorderHeight->setValue(set.value("heightmapBorderHeight", 1).toDouble());
+     ui->chkHeightMapBorderShow->setChecked(set.value("heightmapBorderShow", false).toBool());
+ 
+-    ui->txtHeightMapGridX->setValue(set.value("heightmapGridX", 1).toDouble());
+-    ui->txtHeightMapGridY->setValue(set.value("heightmapGridY", 1).toDouble());
++    ui->txtHeightMapGridX->setValue(set.value("heightmapGridX", 5).toDouble());
++    ui->txtHeightMapGridY->setValue(set.value("heightmapGridY", 5).toDouble());
+     ui->txtHeightMapGridZTop->setValue(set.value("heightmapGridZTop", 1).toDouble());
+-    ui->txtHeightMapGridZBottom->setValue(set.value("heightmapGridZBottom", -1).toDouble());
++    ui->txtHeightMapGridZBottom->setValue(set.value("heightmapGridZBottom", -0.5).toDouble());
+     ui->chkHeightMapGridShow->setChecked(set.value("heightmapGridShow", false).toBool());
+ 
+     ui->txtHeightMapInterpolationStepX->setValue(set.value("heightmapInterpolationStepX", 1).toDouble());
+@@ -467,10 +467,10 @@ void frmMain::loadSettings()
+     ui->scrollArea->updateMinimumWidth();
+ 
+     // Restore panels state
+-    ui->grpUserCommands->setChecked(set.value("userCommandsPanel", true).toBool());
++    ui->grpUserCommands->setChecked(set.value("userCommandsPanel", false).toBool());
+     ui->grpHeightMap->setChecked(set.value("heightmapPanel", true).toBool());
+     ui->grpSpindle->setChecked(set.value("spindlePanel", true).toBool());
+-    ui->grpOverriding->setChecked(set.value("feedPanel", true).toBool());
++    ui->grpOverriding->setChecked(set.value("feedPanel", false).toBool());
+     ui->grpJog->setChecked(set.value("jogPanel", true).toBool());
+ 
+     // Restore last commands list
+@@ -666,8 +666,8 @@ void frmMain::updateControlsState() {
+         ui->txtStatus->setStyleSheet(QString("background-color: palette(button); color: palette(text);"));
+     }
+ 
+-    this->setWindowTitle(m_programFileName.isEmpty() ? qApp->applicationDisplayName()
+-                                                     : m_programFileName.mid(m_programFileName.lastIndexOf("/") + 1) + " - " + qApp->applicationDisplayName());
++    this->setWindowTitle(m_programFileName.isEmpty() ? tr("Candle PCB")
++                                                     : m_programFileName.mid(m_programFileName.lastIndexOf("/") + 1) + " - " + tr("Candle PCB"));
+ 
+     if (!m_processingFile) ui->chkKeyboardControl->setChecked(m_storedKeyboardControl);
+ 
+diff --git a/src/frmsettings.cpp b/src/frmsettings.cpp
+index cdc8737..fbcd8e7 100644
+--- a/src/frmsettings.cpp
++++ b/src/frmsettings.cpp
+@@ -16,6 +16,13 @@ frmSettings::frmSettings(QWidget *parent) :
+     ui->setupUi(this);
+ 
+     this->setLocale(QLocale::C);
++
++    // PCB edition: laser options are not used
++    ui->label_18->hide();
++    ui->txtLaserPowerMin->hide();
++    ui->label_35->hide();
++    ui->txtLaserPowerMax->hide();
++
+     m_intValidator.setBottom(1);
+     m_intValidator.setTop(999);
+     ui->cboFps->setValidator(&m_intValidator);
+diff --git a/src/main.cpp b/src/main.cpp
+index aeed2e0..03509c3 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -43,9 +43,11 @@ int main(int argc, char *argv[])
+ 
+ //    QLocale::setDefault(QLocale("es"));
+ 
+-    QString loc = QLocale().name().left(2);
++    // PCB edition: Vietnamese UI by default when the translation file is present
+     QString translationsFolder = qApp->applicationDirPath() + "/translations/";
+-    QString translationFileName = translationsFolder + qApp->applicationDisplayName() + "_" + loc + ".qm";
++    QString loc = QLocale().name().left(2);
++    if (QFile::exists(translationsFolder + "candle_vi.qm")) loc = "vi";
++    QString translationFileName = translationsFolder + "candle_" + loc + ".qm";
+ 
+     qDebug() << "locale:" << loc;
+ 
+@@ -56,7 +58,7 @@ int main(int argc, char *argv[])
+ 
+     QString baseTranslationFileName = translationsFolder + "qt_" + loc + ".qm";
+ 
+-    if(QFile::exists(translationFileName)) {
++    if(QFile::exists(baseTranslationFileName)) {
+         QTranslator* baseTranslator = new QTranslator();
+         if (baseTranslator->load(baseTranslationFileName)) a.installTranslator(baseTranslator); else delete baseTranslator;
+     }
+diff --git a/src/translations/candle_vi.qm b/src/translations/candle_vi.qm
+new file mode 100644
+index 0000000..e25a0bc
+Binary files /dev/null and b/src/translations/candle_vi.qm differ
+diff --git a/src/translations/candle_vi.ts b/src/translations/candle_vi.ts
+new file mode 100644
+index 0000000..849c2a5
+--- /dev/null
++++ b/src/translations/candle_vi.ts
+@@ -0,0 +1,1429 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!DOCTYPE TS>
++<TS version="2.1" language="vi_VN">
++<context>
++    <name>GCodeTableModel</name>
++    <message>
++        <location filename="../tables/gcodetablemodel.cpp" line="9"/>
++        <source>#</source>
++        <translation type="unfinished"></translation>
++    </message>
++    <message>
++        <location filename="../tables/gcodetablemodel.cpp" line="9"/>
++        <source>Command</source>
++        <translation>Lệnh</translation>
++    </message>
++    <message>
++        <location filename="../tables/gcodetablemodel.cpp" line="9"/>
++        <source>State</source>
++        <translation>Trạng thái</translation>
++    </message>
++    <message>
++        <location filename="../tables/gcodetablemodel.cpp" line="9"/>
++        <source>Response</source>
++        <translation>Phản hồi</translation>
++    </message>
++    <message>
++        <location filename="../tables/gcodetablemodel.cpp" line="9"/>
++        <source>Line</source>
++        <translation>Dòng</translation>
++    </message>
++    <message>
++        <location filename="../tables/gcodetablemodel.cpp" line="9"/>
++        <source>Args</source>
++        <translation>Tham số</translation>
++    </message>
++    <message>
++        <location filename="../tables/gcodetablemodel.cpp" line="26"/>
++        <source>In queue</source>
++        <translation>Trong hàng đợi</translation>
++    </message>
++    <message>
++        <location filename="../tables/gcodetablemodel.cpp" line="27"/>
++        <source>Sent</source>
++        <translation>Đã gửi</translation>
++    </message>
++    <message>
++        <location filename="../tables/gcodetablemodel.cpp" line="28"/>
++        <source>Processed</source>
++        <translation>Đã xử lý</translation>
++    </message>
++    <message>
++        <location filename="../tables/gcodetablemodel.cpp" line="29"/>
++        <source>Skipped</source>
++        <translation>Bỏ qua</translation>
++    </message>
++    <message>
++        <location filename="../tables/gcodetablemodel.cpp" line="31"/>
++        <source>Unknown</source>
++        <translation>Không rõ</translation>
++    </message>
++</context>
++<context>
++    <name>GLWidget</name>
++    <message>
++        <location filename="../widgets/glwidget.cpp" line="495"/>
++        <source>Vertices: %1</source>
++        <translation>Số đỉnh: %1</translation>
++    </message>
++</context>
++<context>
++    <name>SliderBox</name>
++    <message>
++        <location filename="../widgets/sliderbox.ui" line="14"/>
++        <source>Form</source>
++        <translation>Biểu mẫu</translation>
++    </message>
++    <message>
++        <location filename="../widgets/sliderbox.ui" line="34"/>
++        <location filename="../widgets/sliderbox.ui" line="41"/>
++        <source>Title:</source>
++        <translation>Tiêu đề:</translation>
++    </message>
++</context>
++<context>
++    <name>frmAbout</name>
++    <message>
++        <location filename="../frmabout.ui" line="14"/>
++        <source>About</source>
++        <translation>Giới thiệu</translation>
++    </message>
++    <message>
++        <location filename="../frmabout.ui" line="61"/>
++        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Candle&lt;br/&gt;Version: %1&lt;br/&gt;License: GNU GENERAL PUBLIC LICENSE&lt;br/&gt;Visit: &lt;a href=&quot;https://github.com/Denvi/Candle/&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#0000ff;&quot;&gt;https://github.com/Denvi/Candle/&lt;br/&gt;&lt;/span&gt;&lt;/a&gt;© 2015-2016 Hayrullin Denis Ravilevich&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
++        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Candle PCB (bản chỉ dùng phay mạch in)&lt;br/&gt;Phiên bản: %1&lt;br/&gt;Giấy phép: GNU GENERAL PUBLIC LICENSE&lt;br/&gt;Mã nguồn gốc: &lt;a href=&quot;https://github.com/Denvi/Candle/&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#0000ff;&quot;&gt;https://github.com/Denvi/Candle/&lt;br/&gt;&lt;/span&gt;&lt;/a&gt;© 2015-2016 Hayrullin Denis Ravilevich&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
++    </message>
++    <message>
++        <location filename="../frmabout.ui" line="86"/>
++        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;The program is provided AS IS without any guarantees or warranty. Use at your own risk.&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
++        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;Phần mềm được cung cấp NGUYÊN TRẠNG, không có bảo hành. Người dùng tự chịu rủi ro.&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
++    </message>
++    <message>
++        <location filename="../frmabout.ui" line="123"/>
++        <source>OK</source>
++        <translation>OK</translation>
++    </message>
++</context>
++<context>
++    <name>frmMain</name>
++    <message>
++        <location filename="../frmmain.ui" line="17"/>
++        <source>Candle</source>
++        <translation>Candle</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="137"/>
++        <location filename="../frmmain.cpp" line="696"/>
++        <source>G-code program</source>
++        <translation>Chương trình G-code</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="167"/>
++        <source>Isometric view</source>
++        <translation>Góc nhìn 3D</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="193"/>
++        <source>Top view</source>
++        <translation>Nhìn từ trên</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="219"/>
++        <source>Front view</source>
++        <translation>Nhìn từ trước</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="245"/>
++        <source>Left view</source>
++        <translation>Nhìn từ trái</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="271"/>
++        <source>Fit</source>
++        <translation>Vừa khung</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="400"/>
++        <source>Heightmap settings</source>
++        <translation>Thiết lập bản đồ cao</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="423"/>
++        <source>Border:</source>
++        <translation>Vùng dò:</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="432"/>
++        <location filename="../frmmain.ui" line="608"/>
++        <location filename="../frmmain.ui" line="803"/>
++        <source>X:</source>
++        <translation type="unfinished"></translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="492"/>
++        <source>H:</source>
++        <translation>C:</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="524"/>
++        <location filename="../frmmain.ui" line="740"/>
++        <location filename="../frmmain.ui" line="796"/>
++        <source>Y:</source>
++        <translation type="unfinished"></translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="531"/>
++        <source>W:</source>
++        <translation>R:</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="570"/>
++        <source>Show border</source>
++        <translation>Hiện vùng dò</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="586"/>
++        <source>Auto</source>
++        <translation>Tự động</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="599"/>
++        <source>Probe grid:</source>
++        <translation>Lưới dò Z:</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="733"/>
++        <source>Zb:</source>
++        <translation>Z dưới:</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="747"/>
++        <source>Zt:</source>
++        <translation>Z trên:</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="758"/>
++        <source>Show grid</source>
++        <translation>Hiện lưới</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="787"/>
++        <source>Interpolation grid:</source>
++        <translation>Lưới nội suy:</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="876"/>
++        <source>Type:</source>
++        <translation>Loại:</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="893"/>
++        <source>Bicubic</source>
++        <translation>Bicubic</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="905"/>
++        <source>Show</source>
++        <translation>Hiện</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="946"/>
++        <location filename="../frmmain.cpp" line="1516"/>
++        <source>Check mode</source>
++        <translation>Chế độ kiểm tra</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="965"/>
++        <location filename="../frmmain.cpp" line="1510"/>
++        <source>Autoscroll</source>
++        <translation>Tự cuộn</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="985"/>
++        <location filename="../frmmain.ui" line="1844"/>
++        <location filename="../frmmain.cpp" line="1611"/>
++        <location filename="../frmmain.cpp" line="1625"/>
++        <location filename="../frmmain.cpp" line="3475"/>
++        <source>Open</source>
++        <translation>Mở</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="992"/>
++        <location filename="../frmmain.ui" line="1448"/>
++        <source>Reset</source>
++        <translation>Đặt lại</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="1011"/>
++        <location filename="../frmmain.cpp" line="718"/>
++        <source>Send</source>
++        <translation>Chạy</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="1018"/>
++        <source>Pause</source>
++        <translation>Tạm dừng</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="1028"/>
++        <location filename="../frmmain.cpp" line="1701"/>
++        <location filename="../frmmain.cpp" line="2300"/>
++        <location filename="../frmmain.cpp" line="3521"/>
++        <source>Abort</source>
++        <translation>Hủy</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="1047"/>
++        <source>State</source>
++        <translation>Trạng thái</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="1075"/>
++        <source>Work coordinates:</source>
++        <translation>Tọa độ làm việc:</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="1089"/>
++        <location filename="../frmmain.ui" line="1162"/>
++        <source>X</source>
++        <translation type="unfinished"></translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="1092"/>
++        <location filename="../frmmain.ui" line="1108"/>
++        <location filename="../frmmain.ui" line="1124"/>
++        <location filename="../frmmain.ui" line="1165"/>
++        <location filename="../frmmain.ui" line="1181"/>
++        <location filename="../frmmain.ui" line="1197"/>
++        <source>0</source>
++        <translation type="unfinished"></translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="1105"/>
++        <location filename="../frmmain.ui" line="1178"/>
++        <source>Y</source>
++        <translation type="unfinished"></translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="1121"/>
++        <location filename="../frmmain.ui" line="1194"/>
++        <source>Z</source>
++        <translation type="unfinished"></translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="1148"/>
++        <source>Machine coordinates:</source>
++        <translation>Tọa độ máy:</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="1219"/>
++        <source>Status:</source>
++        <translation>Trạng thái:</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="1257"/>
++        <source>Control</source>
++        <translation>Điều khiển</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="1289"/>
++        <location filename="../frmmain.cpp" line="57"/>
++        <source>Home</source>
++        <translation>Về home</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="1292"/>
++        <location filename="../frmmain.ui" line="1318"/>
++        <location filename="../frmmain.ui" line="1344"/>
++        <location filename="../frmmain.ui" line="1370"/>
++        <location filename="../frmmain.ui" line="1399"/>
++        <location filename="../frmmain.ui" line="1425"/>
++        <location filename="../frmmain.ui" line="1451"/>
++        <location filename="../frmmain.ui" line="1480"/>
++        <location filename="../frmmain.ui" line="2089"/>
++        <source>...</source>
++        <translation type="unfinished"></translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="1315"/>
++        <source>Z-probe</source>
++        <translation>Dò Z</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="1341"/>
++        <source>Zero XY</source>
++        <translation>Gốc XY</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="1367"/>
++        <source>Zero Z</source>
++        <translation>Gốc Z</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="1396"/>
++        <source>Restore origin</source>
++        <translation>Về gốc</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="1422"/>
++        <source>Safe position</source>
++        <translation>Vị trí an toàn</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="1477"/>
++        <source>Unlock</source>
++        <translation>Mở khóa</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="1573"/>
++        <source>User commands</source>
++        <translation>Lệnh tùy chọn</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="1629"/>
++        <location filename="../frmmain.ui" line="1655"/>
++        <location filename="../frmmain.ui" line="1681"/>
++        <location filename="../frmmain.ui" line="1707"/>
++        <location filename="../frmmain.ui" line="1941"/>
++        <source>Spindle on/off</source>
++        <translation>Bật/tắt trục chính</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="1732"/>
++        <location filename="../frmmain.cpp" line="696"/>
++        <source>Heightmap</source>
++        <translation>Bản đồ cao</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="1774"/>
++        <source>Use heightmap</source>
++        <translation>Dùng bản đồ cao</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="1783"/>
++        <source>Map:</source>
++        <translation>Bản đồ:</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="1802"/>
++        <source>Absent</source>
++        <translation>Chưa có</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="1825"/>
++        <source>Create</source>
++        <translation>Tạo</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="1865"/>
++        <source>Edit mode</source>
++        <translation>Chế độ sửa</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="1884"/>
++        <location filename="../frmmain.cpp" line="254"/>
++        <location filename="../frmmain.cpp" line="2446"/>
++        <location filename="../frmmain.cpp" line="2448"/>
++        <location filename="../frmmain.cpp" line="2765"/>
++        <location filename="../frmmain.cpp" line="2768"/>
++        <source>Spindle</source>
++        <translation>Trục chính</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="1970"/>
++        <location filename="../frmmain.cpp" line="2750"/>
++        <location filename="../frmmain.cpp" line="2752"/>
++        <source>Overriding</source>
++        <translation>Hiệu chỉnh tốc độ</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="2024"/>
++        <location filename="../frmmain.cpp" line="63"/>
++        <location filename="../frmmain.cpp" line="2956"/>
++        <location filename="../frmmain.cpp" line="2958"/>
++        <source>Jog</source>
++        <translation>Di chuyển tay</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="2086"/>
++        <source>X-</source>
++        <translation type="unfinished"></translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="2123"/>
++        <source>Y-</source>
++        <translation type="unfinished"></translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="2157"/>
++        <source>X+</source>
++        <translation type="unfinished"></translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="2194"/>
++        <source>Y+</source>
++        <translation type="unfinished"></translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="2246"/>
++        <source>Z+</source>
++        <translation type="unfinished"></translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="2298"/>
++        <source>Z-</source>
++        <translation type="unfinished"></translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="2337"/>
++        <source>Stop</source>
++        <translation>Dừng</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="2373"/>
++        <source>Continuously</source>
++        <translation>Liên tục</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="2378"/>
++        <source>0.01</source>
++        <translation type="unfinished"></translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="2383"/>
++        <source>0.1</source>
++        <translation type="unfinished"></translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="2388"/>
++        <source>1</source>
++        <translation type="unfinished"></translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="2393"/>
++        <source>5</source>
++        <translation type="unfinished"></translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="2398"/>
++        <location filename="../frmmain.ui" line="2432"/>
++        <source>10</source>
++        <translation type="unfinished"></translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="2403"/>
++        <location filename="../frmmain.ui" line="2442"/>
++        <source>100</source>
++        <translation type="unfinished"></translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="2411"/>
++        <source>Step:</source>
++        <translation>Bước:</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="2418"/>
++        <source>Feed:</source>
++        <translation>Tốc độ:</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="2437"/>
++        <source>50</source>
++        <translation type="unfinished"></translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="2447"/>
++        <source>500</source>
++        <translation type="unfinished"></translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="2452"/>
++        <source>1000</source>
++        <translation type="unfinished"></translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="2457"/>
++        <source>2000</source>
++        <translation type="unfinished"></translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="2467"/>
++        <source>Keyboard control</source>
++        <translation>Điều khiển bằng phím</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="2491"/>
++        <source>Console</source>
++        <translation>Cửa sổ lệnh</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="2569"/>
++        <source>Send command</source>
++        <translation>Gửi lệnh</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="2586"/>
++        <source>Clear console</source>
++        <translation>Xóa cửa sổ lệnh</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="2624"/>
++        <source>&amp;File</source>
++        <translation>&amp;Tệp</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="2628"/>
++        <source>&amp;Recent files</source>
++        <translation>Tệp &amp;gần đây</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="2645"/>
++        <source>&amp;Service</source>
++        <translation>&amp;Dịch vụ</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="2651"/>
++        <source>&amp;Help</source>
++        <translation>T&amp;rợ giúp</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="2661"/>
++        <source>&amp;Open</source>
++        <translation>&amp;Mở</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="2666"/>
++        <source>E&amp;xit</source>
++        <translation>Th&amp;oát</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="2671"/>
++        <source>&amp;Settings</source>
++        <translation>&amp;Cài đặt</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="2676"/>
++        <source>&amp;New</source>
++        <translation>&amp;Mới</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="2681"/>
++        <source>&amp;Save</source>
++        <translation>&amp;Lưu</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="2686"/>
++        <source>Save &amp;as...</source>
++        <translation>Lưu &amp;thành...</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="2691"/>
++        <source>&amp;About</source>
++        <translation>&amp;Giới thiệu</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="2696"/>
++        <source>&amp;Clear</source>
++        <translation>&amp;Xóa</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.ui" line="2701"/>
++        <source>Save &amp;transformed as...</source>
++        <translation>Lưu bản đã &amp;biến đổi thành...</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="53"/>
++        <source>Unknown</source>
++        <translation>Không rõ</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="54"/>
++        <source>Idle</source>
++        <translation>Rảnh</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="55"/>
++        <source>Alarm</source>
++        <translation>Báo động</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="56"/>
++        <source>Run</source>
++        <translation>Đang chạy</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="58"/>
++        <location filename="../frmmain.cpp" line="59"/>
++        <source>Hold</source>
++        <translation>Giữ</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="60"/>
++        <source>Queue</source>
++        <translation>Hàng đợi</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="61"/>
++        <location filename="../frmmain.cpp" line="1495"/>
++        <location filename="../frmmain.cpp" line="1501"/>
++        <location filename="../frmmain.cpp" line="1515"/>
++        <source>Check</source>
++        <translation>Kiểm tra</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="62"/>
++        <source>Door</source>
++        <translation>Cửa</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="138"/>
++        <source>Send from current line</source>
++        <translation>Chạy từ dòng hiện tại</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="152"/>
++        <source>Feed rate:</source>
++        <translation>Tốc độ cắt:</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="166"/>
++        <source>Rapid speed:</source>
++        <translation>Tốc độ chạy nhanh:</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="180"/>
++        <source>Spindle speed:</source>
++        <translation>Tốc độ trục chính:</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="201"/>
++        <source>&amp;Insert line</source>
++        <translation>&amp;Chèn dòng</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="202"/>
++        <source>&amp;Delete lines</source>
++        <translation>&amp;Xóa dòng</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="233"/>
++        <source>Don&apos;t show again</source>
++        <translation>Không hiện lại</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="248"/>
++        <source>Speed:</source>
++        <translation>Tốc độ:</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="254"/>
++        <location filename="../frmmain.cpp" line="2446"/>
++        <location filename="../frmmain.cpp" line="2768"/>
++        <source> (%1)</source>
++        <translation type="unfinished"></translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="401"/>
++        <location filename="../frmmain.cpp" line="1151"/>
++        <source>Restore origin:
++%1, %2, %3</source>
++        <translation>Về gốc:
++%1, %2, %3</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="600"/>
++        <source>G-code program file was changed. Save?</source>
++        <translation>Tệp G-code đã thay đổi. Lưu lại?</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="608"/>
++        <source>Heightmap file was changed. Save?</source>
++        <translation>Tệp bản đồ cao đã thay đổi. Lưu lại?</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="665"/>
++        <source>Not connected</source>
++        <translation>Chưa kết nối</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="669"/>
++        <location filename="../frmmain.cpp" line="670"/>
++        <source>Candle PCB</source>
++        <translation>Candle PCB</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="718"/>
++        <source>Probe</source>
++        <translation>Dò Z</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="732"/>
++        <source>Port opened</source>
++        <translation>Đã mở cổng</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="930"/>
++        <source>Job done.
++Time elapsed: %1</source>
++        <translation>Hoàn thành.
++Thời gian: %1</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="1059"/>
++        <source>PS: %1</source>
++        <translation type="unfinished"></translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="1076"/>
++        <source>AS: %1</source>
++        <translation type="unfinished"></translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="1087"/>
++        <source>F/S: %1 / %2</source>
++        <translation type="unfinished"></translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="1268"/>
++        <source>Error message(s) received:
++</source>
++        <translation>Nhận được thông báo lỗi:
++</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="1375"/>
++        <source>Serial port error </source>
++        <translation>Lỗi cổng nối tiếp </translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="1406"/>
++        <source>Buffer: %1 / %2 / %3</source>
++        <translation>Bộ đệm: %1 / %2 / %3</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="1503"/>
++        <location filename="../frmmain.cpp" line="1509"/>
++        <source>Scroll</source>
++        <translation>Cuộn</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="1545"/>
++        <source>File sending in progress. Terminate and exit?</source>
++        <translation>Đang chạy chương trình. Dừng và thoát?</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="1612"/>
++        <source>G-Code files (*.nc *.ncc *.ngc *.tap *.txt);;All files (*.*)</source>
++        <translation>Tệp G-code (*.nc *.ncc *.ngc *.tap *.txt);;Mọi tệp (*.*)</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="1625"/>
++        <location filename="../frmmain.cpp" line="2643"/>
++        <location filename="../frmmain.cpp" line="3475"/>
++        <source>Heightmap files (*.map)</source>
++        <translation>Tệp bản đồ cao (*.map)</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="1701"/>
++        <source>Opening file...</source>
++        <translation>Đang mở tệp...</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="1774"/>
++        <location filename="../frmmain.cpp" line="3391"/>
++        <source>Can&apos;t open file:
++</source>
++        <translation>Không mở được tệp:
++</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="1916"/>
++        <source>Following commands will be sent before selected line:
++</source>
++        <translation>Các lệnh sau sẽ được gửi trước dòng đã chọn:
++</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="1919"/>
++        <source>Skip</source>
++        <translation>Bỏ qua</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="2138"/>
++        <source>Delete lines?</source>
++        <translation>Xóa các dòng?</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="2300"/>
++        <source>Updating...</source>
++        <translation>Đang cập nhật...</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="2581"/>
++        <source>Untitled</source>
++        <translation>Chưa đặt tên</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="2621"/>
++        <location filename="../frmmain.cpp" line="2631"/>
++        <location filename="../frmmain.cpp" line="2643"/>
++        <source>Save file as</source>
++        <translation>Lưu tệp thành</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="2621"/>
++        <location filename="../frmmain.cpp" line="2631"/>
++        <source>G-Code files (*.nc *.ncc *.ngc *.tap *.txt)</source>
++        <translation>Tệp G-code (*.nc *.ncc *.ngc *.tap *.txt)</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="2752"/>
++        <source> (%1/%2/%3)</source>
++        <translation type="unfinished"></translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="2958"/>
++        <source> (%1/%2)</source>
++        <translation type="unfinished"></translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="2959"/>
++        <source>C</source>
++        <translation type="unfinished"></translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="3127"/>
++        <source>Changing grid settings will reset probe data. Continue?</source>
++        <translation>Đổi thiết lập lưới sẽ xóa dữ liệu dò Z. Tiếp tục?</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="3521"/>
++        <source>Applying heightmap...</source>
++        <translation>Đang áp dụng bản đồ cao...</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="3545"/>
++        <source>Subdividing segments...</source>
++        <translation>Đang chia nhỏ đoạn...</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="3571"/>
++        <source>Updating Z-coordinates...</source>
++        <translation>Đang cập nhật tọa độ Z...</translation>
++    </message>
++    <message>
++        <location filename="../frmmain.cpp" line="3597"/>
++        <source>Modifying G-code program...</source>
++        <translation>Đang sửa chương trình G-code...</translation>
++    </message>
++</context>
++<context>
++    <name>frmSettings</name>
++    <message>
++        <location filename="../frmsettings.ui" line="14"/>
++        <source>Settings</source>
++        <translation>Cài đặt</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="83"/>
++        <source>Connection</source>
++        <translation>Kết nối</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="91"/>
++        <source>Port:</source>
++        <translation>Cổng:</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="114"/>
++        <source>...</source>
++        <translation type="unfinished"></translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="125"/>
++        <source>Baud:</source>
++        <translation>Tốc độ baud:</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="135"/>
++        <location filename="../frmsettings.ui" line="139"/>
++        <source>9600</source>
++        <translation type="unfinished"></translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="144"/>
++        <source>14400</source>
++        <translation type="unfinished"></translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="149"/>
++        <source>19200</source>
++        <translation type="unfinished"></translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="154"/>
++        <source>38400</source>
++        <translation type="unfinished"></translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="159"/>
++        <source>57600</source>
++        <translation type="unfinished"></translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="164"/>
++        <source>115200</source>
++        <translation type="unfinished"></translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="177"/>
++        <source>Sender</source>
++        <translation>Gửi lệnh</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="183"/>
++        <source>Ignore error responses</source>
++        <translation>Bỏ qua phản hồi lỗi</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="190"/>
++        <source>Automatically set parser state before sending from selected line</source>
++        <translation>Tự đặt trạng thái bộ phân tích trước khi chạy từ dòng đã chọn</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="200"/>
++        <source>Machine information</source>
++        <translation>Thông tin máy</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="226"/>
++        <source>Status query period:</source>
++        <translation>Chu kỳ hỏi trạng thái:</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="258"/>
++        <source>mm</source>
++        <translation>mm</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="263"/>
++        <source>inch</source>
++        <translation>inch</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="287"/>
++        <source>Units:</source>
++        <translation>Đơn vị:</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="294"/>
++        <source>Rapid speed:</source>
++        <translation>Tốc độ chạy nhanh:</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="319"/>
++        <source>Acceleration:</source>
++        <translation>Gia tốc:</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="344"/>
++        <location filename="../frmsettings.ui" line="401"/>
++        <source>max.:</source>
++        <translation>tối đa:</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="351"/>
++        <source>Spindle speed min.:</source>
++        <translation>Tốc độ trục chính tối thiểu:</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="376"/>
++        <source>Laser power min.:</source>
++        <translation type="unfinished"></translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="431"/>
++        <source>Control</source>
++        <translation>Điều khiển</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="440"/>
++        <source>Probe commands:</source>
++        <translation>Lệnh dò Z:</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="453"/>
++        <location filename="../frmsettings.ui" line="476"/>
++        <location filename="../frmsettings.ui" line="562"/>
++        <location filename="../frmsettings.ui" line="585"/>
++        <location filename="../frmsettings.ui" line="608"/>
++        <location filename="../frmsettings.ui" line="631"/>
++        <source>Command 1; command 2; ...</source>
++        <translation>Lệnh 1; lệnh 2; ...</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="463"/>
++        <source>Safe position commands:</source>
++        <translation>Lệnh về vị trí an toàn:</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="493"/>
++        <source>&quot;Restore origin&quot; moves tool in:</source>
++        <translation>&quot;Về gốc&quot; di chuyển dao theo:</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="506"/>
++        <source>Plane</source>
++        <translation>Mặt phẳng</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="511"/>
++        <source>Space</source>
++        <translation>Không gian</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="540"/>
++        <location filename="../frmsettings.ui" line="1200"/>
++        <source>User commands</source>
++        <translation>Lệnh tùy chọn</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="549"/>
++        <source>Button 1:</source>
++        <translation>Nút 1:</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="572"/>
++        <source>Button 2:</source>
++        <translation>Nút 2:</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="595"/>
++        <source>Button 3:</source>
++        <translation>Nút 3:</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="618"/>
++        <source>Button 4:</source>
++        <translation>Nút 4:</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="641"/>
++        <location filename="../frmsettings.ui" line="1207"/>
++        <source>Heightmap</source>
++        <translation>Bản đồ cao</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="649"/>
++        <source>Heightmap probing feed:</source>
++        <translation>Tốc độ dò bản đồ cao:</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="692"/>
++        <source>Parser</source>
++        <translation>Bộ phân tích</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="700"/>
++        <source>Arc approximation segment size:</source>
++        <translation>Kích thước đoạn xấp xỉ cung:</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="724"/>
++        <source>by length</source>
++        <translation>theo độ dài</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="769"/>
++        <source>by angle (deg.)</source>
++        <translation>theo góc (độ)</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="800"/>
++        <location filename="../frmsettings.ui" line="1309"/>
++        <source>Visualizer</source>
++        <translation>Hiển thị</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="808"/>
++        <source>Z-buffer</source>
++        <translation>Z-buffer</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="818"/>
++        <source>MSAA</source>
++        <translation>MSAA</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="827"/>
++        <source>Line width:</source>
++        <translation>Độ dày nét:</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="854"/>
++        <source>FPS lock:</source>
++        <translation>Giới hạn FPS:</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="868"/>
++        <source>30</source>
++        <translation type="unfinished"></translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="873"/>
++        <source>60</source>
++        <translation type="unfinished"></translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="878"/>
++        <source>120</source>
++        <translation type="unfinished"></translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="888"/>
++        <source>Program draw mode:</source>
++        <translation>Chế độ vẽ chương trình:</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="895"/>
++        <source>Vectors</source>
++        <translation>Vector</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="908"/>
++        <source>Raster</source>
++        <translation>Raster</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="937"/>
++        <source>By &apos;Z&apos;-code</source>
++        <translation>Theo mã &apos;Z&apos;</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="950"/>
++        <source>By &apos;S&apos;-code</source>
++        <translation>Theo mã &apos;S&apos;</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="960"/>
++        <source>Grayscale segments</source>
++        <translation>Đoạn thang xám</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="986"/>
++        <source>Simplify geometry</source>
++        <translation>Đơn giản hóa hình học</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="996"/>
++        <source>Precision:</source>
++        <translation>Độ chính xác:</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="1003"/>
++        <source>V-sync</source>
++        <translation>V-sync</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="1010"/>
++        <source>Smoothing</source>
++        <translation>Làm mịn</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="1022"/>
++        <source>Tool model</source>
++        <translation>Mô hình dao</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="1028"/>
++        <source>Type:</source>
++        <translation>Loại:</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="1035"/>
++        <source>Diameter:</source>
++        <translation>Đường kính:</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="1049"/>
++        <source>Flat</source>
++        <translation>Phẳng</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="1054"/>
++        <source>Conic</source>
++        <translation>Mũi V (côn)</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="1065"/>
++        <source>Angle:</source>
++        <translation>Góc:</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="1072"/>
++        <source>Length:</source>
++        <translation>Chiều dài:</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="1164"/>
++        <source>Console</source>
++        <translation>Cửa sổ lệnh</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="1170"/>
++        <source>Show G-code program commands</source>
++        <translation>Hiện lệnh của chương trình G-code</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="1177"/>
++        <source>Show UI commands</source>
++        <translation>Hiện lệnh từ giao diện</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="1184"/>
++        <source>Command auto-completion</source>
++        <translation>Tự hoàn thành lệnh</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="1194"/>
++        <source>Panels</source>
++        <translation>Bảng điều khiển</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="1214"/>
++        <source>Jog</source>
++        <translation>Di chuyển tay</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="1221"/>
++        <source>Spindle</source>
++        <translation>Trục chính</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="1228"/>
++        <source>Overriding</source>
++        <translation>Hiệu chỉnh tốc độ</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="1238"/>
++        <source>Colors</source>
++        <translation>Màu sắc</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="1246"/>
++        <source>Z-movement:</source>
++        <translation>Di chuyển Z:</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="1253"/>
++        <source>Toolpath</source>
++        <translation>Đường chạy dao</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="1266"/>
++        <source>Background:</source>
++        <translation>Nền:</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="1279"/>
++        <source>Highlight:</source>
++        <translation>Đánh dấu:</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="1286"/>
++        <source>Start point:</source>
++        <translation>Điểm đầu:</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="1296"/>
++        <source>End point:</source>
++        <translation>Điểm cuối:</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="1316"/>
++        <source>Text:</source>
++        <translation>Chữ:</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="1323"/>
++        <source>Tool:</source>
++        <translation>Dao:</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="1349"/>
++        <source>Drawn:</source>
++        <translation>Đã vẽ:</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="1362"/>
++        <source>Normal:</source>
++        <translation>Bình thường:</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="1374"/>
++        <source>Font</source>
++        <translation>Phông chữ</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="1380"/>
++        <source>Size:</source>
++        <translation>Cỡ:</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="1396"/>
++        <location filename="../frmsettings.ui" line="1406"/>
++        <source>8</source>
++        <translation type="unfinished"></translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="1411"/>
++        <source>9</source>
++        <translation type="unfinished"></translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="1416"/>
++        <source>10</source>
++        <translation type="unfinished"></translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="1421"/>
++        <source>11</source>
++        <translation type="unfinished"></translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="1426"/>
++        <source>12</source>
++        <translation type="unfinished"></translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="1434"/>
++        <source>pt</source>
++        <translation>pt</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="1457"/>
++        <source>(restart needed)</source>
++        <translation>(cần khởi động lại)</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="1488"/>
++        <source>Set to defaults</source>
++        <translation>Về mặc định</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="1511"/>
++        <source>OK</source>
++        <translation>OK</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.ui" line="1521"/>
++        <source>Cancel</source>
++        <translation>Hủy</translation>
++    </message>
++    <message>
++        <location filename="../frmsettings.cpp" line="633"/>
++        <source>Reset settings to default values?</source>
++        <translation>Đặt lại cài đặt về mặc định?</translation>
++    </message>
++</context>
++</TS>
