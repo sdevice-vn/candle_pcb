@@ -14,6 +14,8 @@ jobs:
         shell: bash
         run: |
           git clone --depth 1 --branch v1.1.8 https://github.com/Denvi/Candle.git candle
+          # Windows checkout may convert the patch to CRLF; convert back to LF
+          sed -i 's/\r$//' candle_pcb_vi.patch
           cd candle
           git apply --whitespace=nowarn ../candle_pcb_vi.patch
 
